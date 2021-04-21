@@ -13,14 +13,16 @@ struct GuitarString {
   bool plucked = false;
   int readings;
   bool noteOn = false;
-  long timeOn;
-  long duration;
+  int velocity;
+
 };
 
 const int numStrings = 6;
 GuitarString guitString[numStrings];
 const int numFrets = 7;
 int fret[numFrets];
+
+boolean multiChannel = false;
 
 void setup()
 {
@@ -68,17 +70,40 @@ void loop()
 void fretChecker()
 {
   for (int i = 0; i < numStrings; i++)
-  {
+  {// for each string i
+    bool isFretted = false;
     digitalWrite(guitString[i].pin, HIGH);
     for (int j = numFrets - 1; j >= 0; j--)
-    {
-      //preset these to not fretted, if we are they will be fixed
-      guitString[i].fretted = false;
-      guitString[i].fret = 0;
+    { //for each fret j
       if (digitalRead(fret[j]) == HIGH)
       {
-        guitString[i].fretted = true;
-        guitString[i].fret = j + 1;
+        isFretted = true;
+        if (!guitString[i].fretted)
+        {// if we aren't fretted we flip that flag and update the string
+          guitString[i].fretted = true;
+          guitString[i].fret = j + 1;
+        }else{// the string is already fretted
+          if (guitString[i].fret != j + 1)
+          {// if the fret changes 
+            guitString[i].fret = j + 1;
+            
+          }
+        }
+
+      }
+    }
+    if (!isFretted)
+    {
+      guitString[i].fretted = false;
+      if (guitString[i].noteOn)
+      {
+        guitString[i].noteOn == false;
+        if (multiChannel)
+        {
+          noteOff(i,guitString[i].baseNote + guitString[i].fret);
+        }else{
+          noteOff(0,guitString[i].baseNote + guitString[i].fret);
+        }
       }
     }
     // turn the string back to low so the next one can be done
@@ -86,7 +111,12 @@ void fretChecker()
   }
 
 }
-
+void noteOff(int channel, int note)
+{
+  int cmd = 0x90;
+  cmd += channel;
+  midiPlay(cmd,note,0);
+}
 void midiPlay(int cmd, int note, int velocity)
 {
   /*

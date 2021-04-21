@@ -13,6 +13,8 @@ Needs:
 5? transpose switches
 1 single/multichannel switch --- multichannel output will treat each string as its own midi channel. This will allow each string to have its own pitchwheel setting, and synths that accept multiple channel input will produce polyphonic audio
 Single channel input will reduce all of the data to a single midi channel. This would probably have to disable the bend sensors, or perhaps use a seperate pot as a whammy sensor.
+Buttons for keyswitches? native instruments accepts key switches for mutes/bends,
+cold make things pretty spicy
 
 The hardware aspect of this project is more involved, schematics and drawings will be provided.
 
@@ -35,6 +37,15 @@ Need to decide how often we update the bend/send MIDI CC values. This could be a
 
 Need to determine how NOTE OFF is found. 
 
+
+more thinking out loud:
+
+so each loop we check if each string is fretted. if the string is off its pretty boring, just update the string object. if the string is on however, we have a few things going on.
+if the fret remains the same, chill, do nothing
+if the fret changes, then what? is this a slide or hammer on/pull off? 
+slides note off and send a new note on at 75% velocity?
+
+if the string goes to unfretted we note off. 
 
 
 
