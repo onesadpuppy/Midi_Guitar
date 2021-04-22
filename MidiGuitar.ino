@@ -5,20 +5,33 @@
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 
+const int numReadings = 20;
 struct GuitarString {
   int pin;
+  int pluckpin;
   int baseNote;
   bool fretted = false;
   int fret;
   bool plucked = false;
   int readings;
+  int value[numReadings];
   bool noteOn = false;
   int velocity;
-
+  int threshold = 50;
 };
+
+struct NotePlayed {
+  int note;
+  int velocity;
+  boolean noteOn = false;
+  int newNote; // for slides or hmr/pulloffs
+};
+
 
 const int numStrings = 6;
 GuitarString guitString[numStrings];
+NotePlayed noteList[numStrings];
+
 const int numFrets = 7;
 int fret[numFrets];
 
@@ -62,15 +75,49 @@ void setup()
 void loop()
 {
   fretChecker();
-
+  pluckChecker();
 
 }
 
-
+void pluckChecker()
+{
+  for (int i =0; i < numStrings; i++)
+  {
+   int tmp = analogRead(guitString[i].pluckpin);
+   if (tmp > guitString[i].threshold && guitString[i].plucked == false)
+   {
+    guitString[i].plucked = true;
+    guitString[i].readings = 0;
+   }
+   if (guitString[i].plucked)
+   {
+    guitString[i].value[guitString[i].readings] = tmp;
+    guitString[i].readings++;
+    if (guitString[i].readings == numReadings)
+    {//play me a song!
+      noteList[i].note = guitString[i].baseNote + guitString[i].fret;
+      noteList[i].newNote = noteList[i].note; //keeps from sliding around
+      noteList[i].velocity = pluckAverage(guitString[i].value);
+      noteList[i].noteOn = true;
+    }
+   }
+  }
+}
+int pluckAverage(int readings[])
+{
+  int sum = 0;
+  for (int i =0; i < numReadings; i++)
+  {
+    sum += readings[i];
+  }
+  sum /= numReadings;
+  sum = map(sum, 0,1023,64,127);
+  return sum;
+}
 void fretChecker()
 {
   for (int i = 0; i < numStrings; i++)
-  {// for each string i
+  { // for each string i
     bool isFretted = false;
     digitalWrite(guitString[i].pin, HIGH);
     for (int j = numFrets - 1; j >= 0; j--)
@@ -79,31 +126,26 @@ void fretChecker()
       {
         isFretted = true;
         if (!guitString[i].fretted)
-        {// if we aren't fretted we flip that flag and update the string
+        { // if we aren't fretted we flip that flag and update the string
           guitString[i].fretted = true;
           guitString[i].fret = j + 1;
-        }else{// the string is already fretted
+        } else { // the string is already fretted
           if (guitString[i].fret != j + 1)
-          {// if the fret changes 
+          { // if the fret changes
             guitString[i].fret = j + 1;
-            
+            noteList[i].newNote = guitString[i].baseNote + guitString[i].fret;
           }
         }
-
       }
     }
     if (!isFretted)
     {
       guitString[i].fretted = false;
+      guitString[i].fret =0;
       if (guitString[i].noteOn)
       {
         guitString[i].noteOn == false;
-        if (multiChannel)
-        {
-          noteOff(i,guitString[i].baseNote + guitString[i].fret);
-        }else{
-          noteOff(0,guitString[i].baseNote + guitString[i].fret);
-        }
+        noteOff(i);
       }
     }
     // turn the string back to low so the next one can be done
@@ -111,11 +153,13 @@ void fretChecker()
   }
 
 }
-void noteOff(int channel, int note)
+
+void noteOff(int channel)
 {
   int cmd = 0x90;
   cmd += channel;
-  midiPlay(cmd,note,0);
+  noteList[channel].noteOn = false;
+  midiPlay(cmd, noteList[channel].note, 0);
 }
 void midiPlay(int cmd, int note, int velocity)
 {
